@@ -6,7 +6,7 @@ from http://github.com/olivierhagolle/Sentinel-download (2017-06-06)
 modified to allow API
 Created on Wed Jun  7 13:54:58 2017
 
-@author: Luigi Ranghetti <ranghetti.l @ irea.cnr.it>
+@contributor: Luigi Ranghetti <ranghetti.l @ irea.cnr.it>
 """
 
 import os,sys,math
