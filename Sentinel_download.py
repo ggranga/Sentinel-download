@@ -510,6 +510,8 @@ if __name__ == "__main__":
                 help="Try dhus interface when apihub is not working",default=False)
         parser.add_option("-r",dest="MaxRecords",action="store",type="int",  \
                 help="maximum number of records to download (default=100)",default=100)
+        parser.add_option("--list_only",dest="list_only",action="store_true",  \
+                help="Only list available products, without downloading",default=False)
     
     
         (options, args) = parser.parse_args()
@@ -519,4 +521,4 @@ if __name__ == "__main__":
     Sentinel_download(options.downloader,options.lat,options.lon,options.latmin,options.latmax,options.lonmin,options.lonmax,
                       options.start_ingest_date,options.end_ingest_date,options.start_date,options.level,options.end_date,
                       options.orbit,options.apihub,options.proxy,options.no_download,options.max_cloud,options.write_dir,
-                      options.sentinel,options.tile,options.dhus,options.MaxRecords)
+                      options.sentinel,options.tile,options.dhus,options.MaxRecords,options.list_only)
