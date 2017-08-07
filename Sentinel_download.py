@@ -96,7 +96,7 @@ def get_dir(dir_name,dir_url,product_dir_name,wg,auth,wg_opt,value):
 def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,lonmin=None,lonmax=None,
                       start_ingest_date=None,end_ingest_date=None,start_date=None,level="L1C",end_date=None,
                       orbit=None,apihub=None,proxy=None,no_download=False,max_cloud=110,write_dir='.',
-                      sentinel='S2',tile=None,dhus=False,MaxRecords=100,list_only=False):
+                      sentinel='S2',tile=None,dhus=False,MaxRecords=100,list_only=False,file_list=None):
     
     
     url_search="https://scihub.copernicus.eu/apihub/search?q="
@@ -235,7 +235,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
     # parse catalog output»
     #=======================
     
-    # ggranga edit: if lis_only, do not download but save element as to download later 
+    # ggranga edit: if list_only, do not download but save element to download later 
     if list_only:
         list_prod = list()
         list_filename = list()
@@ -303,7 +303,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                         #do not download the product if it was already downloaded and unzipped, or if no_download option was selected.
                         unzipped_file_exists= os.path.exists(("%s/%s")%(write_dir,filename))
                         print commande_wget
-                        if unzipped_file_exists==False and no_download==False:
+                        if unzipped_file_exists==False and no_download==False and (file_list==None or filename in file_list):
                             os.system(commande_wget)
                         else :
                             print unzipped_file_exists, no_download
@@ -322,7 +322,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                                         if tile_identifier in entry_split:
                                             unzipped_tile_exists= True
         
-                        if unzipped_tile_exists or no_download:
+                        if unzipped_tile_exists or no_download or (file_list!=None and filename not in file_list):
                             print unzipped_tile_exists, no_download
                             print "tile already exists or option -n is set, skipping this download"
                         else:
@@ -446,7 +446,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                                     raise
                                 download_tree(nom_rep_tuile,"granule.xml",wg,auth,wg_opt,value)
 
-    # ggranga edit: if lis_only, return products list
+    # ggranga edit: if list_only, return products list
     if list_only:
         return list_prod, list_filename
 
