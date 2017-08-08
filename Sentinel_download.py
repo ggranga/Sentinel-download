@@ -87,8 +87,211 @@ def get_dir(dir_name,dir_url,product_dir_name,wg,auth,wg_opt,value):
     except KeyboardInterrupt:
         raise
     download_tree(product_dir_name+'/'+dir_name,"temp.xml",wg,auth,wg_opt,value)
-   
+
+# ------------------------
+# Function to preprare wget command
+# (splitted from main function in order to be used both in main than in download_s2product)
+def wg_cmd(downloader,apihub):
+    #====================
+    # read password file
+    #====================
+    try:
+        f=file(apihub)
+        (account,passwd)=f.readline().split(' ')
+        if passwd.endswith('\n'):
+            passwd=passwd[:-1]
+        f.close()
+    except :
+        print "error with password file"
+        sys.exit(-2)
     
+    #==================================================
+    #      prepare wget command line to search catalog
+    #==================================================
+    if os.path.exists('query_results.xml'):
+        os.remove('query_results.xml')
+    
+    if downloader=="aria2":
+        wg='aria2c --check-certificate=false'
+        auth='--http-user="%s" --http-passwd="%s"'%(account,passwd)
+        search_output=" --continue -o query_results.xml"
+        wg_opt=" -o "
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+            value="\$value"
+        else:
+            value="$value"
+    else :
+        wg="wget --no-check-certificate "
+        auth='--user="%s" --password="%s"'%(account,passwd)
+        search_output="--output-document=query_results.xml"
+        wg_opt=" --continue --output-document="
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+            value="\\$value"
+        else:
+            value="$value"
+    
+    return wg,auth,search_output,wg_opt,value
+
+
+
+# ---------------------------------------------------------------
+# Function to download a product after having it in the file list
+# (this function was splitted from main function on order to allow using it with a file list)
+def download_s2product(filename,link,downloader,apihub,tile=None,no_download=False,write_dir='.',file_list=None):
+    
+    # Compute wg parameters
+    (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub)
+    
+    #==================================download  whole product
+    if tile==None:
+        commande_wget='%s %s %s%s/%s "%s"'%(wg,auth,wg_opt,write_dir,filename+".zip",link)
+        #do not download the product if it was already downloaded and unzipped, or if no_download option was selected.
+        unzipped_file_exists= os.path.exists(("%s/%s")%(write_dir,filename))
+        print commande_wget
+        if unzipped_file_exists==False and no_download==False and (file_list==None or filename in file_list):
+            os.system(commande_wget)
+        else :
+            print unzipped_file_exists, no_download
+
+    # download only one tile, file by file.
+    elif tile!=None:
+        #do not download the product if the tile is already downloaded.
+        unzipped_tile_exists = False
+        if os.path.exists(("%s/%s")%(write_dir,filename)):
+            if os.path.exists(("%s/%s/%s")%(write_dir,filename,"GRANULE")):
+                entries = os.listdir(("%s/%s/%s")%(write_dir,filename,"GRANULE"))
+                for entry in entries:
+                    entry_split = entry.split("_")
+                    if len(entry_split) == 11:
+                        tile_identifier = "T"+tile
+                        if tile_identifier in entry_split:
+                            unzipped_tile_exists= True
+
+        if unzipped_tile_exists or no_download or (file_list!=None and filename not in file_list):
+            print unzipped_tile_exists, no_download
+            print "tile already exists or option -n is set, skipping this download"
+        else:
+            #find URL of header file
+            url_file_dir=link.replace(value,"Nodes('%s')/Nodes"%(filename))
+            commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'file_dir.xml',url_file_dir)
+            os.system(commande_wget)
+            try:
+                while os.path.getsize('file_dir.xml')==0 : #in case of "bad gateway error"
+                    os.system(commande_wget)
+                    time.sleep(10)
+            except KeyboardInterrupt:
+                raise
+            urls,types,names,length=get_elements('file_dir.xml')
+            #search for the xml file
+            for i in range(len(urls)):
+                if names[i].find('SAFL1C')>0 or names[i].find('MSIL1C')>0 or names[i].find('SAFL2A')>0 or names[i].find('MSIL2A.xml')>0:
+                    xml=names[i]
+                    url_header=urls[i]
+
+
+            #retrieve list of granules
+            url_granule_dir=link.replace(value,"Nodes('%s')/Nodes('GRANULE')/Nodes"%(filename))
+            print url_granule_dir
+            commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'granule_dir.xml',url_granule_dir)
+            os.system(commande_wget)
+            try:
+                while os.path.getsize('granule_dir.xml')==0 : #in case of "bad gateway error"
+                    os.system(commande_wget)
+                    time.sleep(10)
+            except KeyboardInterrupt:
+                raise
+            urls,types,names,length=get_elements('granule_dir.xml')
+            print(urls)
+            granule=None
+            #search for the tile
+            for i in range(len(urls)):
+                if names[i].find(tile)>0:
+                    granule=names[i]
+            if granule==None:
+                print "========================================================================"
+                print "Tile %s is not available within product (check coordinates or tile name)"%tile
+                print "========================================================================"
+            else :
+                #create product directory
+                product_dir_name=("%s/%s"%(write_dir,filename))
+                if not(os.path.exists(product_dir_name)) :
+                    os.mkdir(product_dir_name)
+                #create tile directory
+                granule_dir_name=("%s/%s"%(product_dir_name,'GRANULE'))
+                if not(os.path.exists(granule_dir_name)) :
+                    os.mkdir(granule_dir_name)
+                #create tile directory
+
+                nom_rep_tuile=("%s/%s"%(granule_dir_name,granule))
+                if not(os.path.exists(nom_rep_tuile)) :
+                    os.mkdir(nom_rep_tuile)
+                # download product header file
+                print "############################################### header"
+                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+xml,url_header+"/"+value)
+                print commande_wget
+                os.system(commande_wget)
+                try:
+                    while os.path.getsize(product_dir_name+'/'+xml)==0 : #in case of "bad gateway error"
+                        os.system(commande_wget)
+                        time.sleep(10)
+                except KeyboardInterrupt:
+                    raise
+                #download INSPIRE.xml
+                url_inspire=link.replace(value,"Nodes('%s')/Nodes('INSPIRE.xml')/"%(filename))
+                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+"INSPIRE.xml",url_inspire+"/"+value)
+
+                print commande_wget
+                os.system(commande_wget)
+                try:
+                    while os.path.getsize(product_dir_name+'/'+"INSPIRE.xml")==0 : #in case of "bad gateway error"
+                        os.system(commande_wget)
+                        time.sleep(10)
+                except KeyboardInterrupt:
+                    raise
+
+                #download manifest.safe
+                url_manifest=link.replace(value,"Nodes('%s')/Nodes('manifest.safe')/"%(filename))
+                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+"manifest.safe",url_manifest+"/"+value)
+                print commande_wget
+                os.system(commande_wget)
+                try:
+                    while os.path.getsize(product_dir_name+'/'+"manifest.safe")==0 : #in case of "bad gateway error"
+                        os.system(commande_wget)
+                        time.sleep(10)
+                except KeyboardInterrupt:
+                    raise
+
+                # rep_info
+                url_rep_info_dir=link.replace(value,"Nodes('%s')/Nodes('rep_info')/Nodes"%(filename))
+                get_dir('rep_info',url_rep_info_dir,product_dir_name,wg,auth,wg_opt,value)
+
+                # HTML
+                url_html_dir=link.replace(value,"Nodes('%s')/Nodes('HTML')/Nodes"%(filename))
+                get_dir('HTML',url_html_dir,product_dir_name,wg,auth,wg_opt,value)
+
+                # AUX_DATA
+                url_auxdata_dir=link.replace(value,"Nodes('%s')/Nodes('AUX_DATA')/Nodes"%(filename))
+                get_dir('AUX_DATA',url_auxdata_dir,product_dir_name,wg,auth,wg_opt,value)
+
+                # DATASTRIP
+                url_datastrip_dir=link.replace(value,"Nodes('%s')/Nodes('DATASTRIP')/Nodes"%(filename))
+                get_dir('DATASTRIP',url_datastrip_dir,product_dir_name,wg,auth,wg_opt,value)
+
+
+                # granule files
+                url_granule="%s('%s')/Nodes"%(url_granule_dir,granule)
+                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'granule.xml',url_granule)
+                print commande_wget
+                os.system(commande_wget)
+                try:
+                    while os.path.getsize("granule.xml")==0 : #in case of "bad gateway error"
+                        os.system(commande_wget)
+                        time.sleep(10)
+                except KeyboardInterrupt:
+                    raise
+                download_tree(nom_rep_tuile,"granule.xml",wg,auth,wg_opt,value)
+    
+
 
 ##########################################################################
 
@@ -117,48 +320,8 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
         print "The tile option (-t) can only be used for Sentinel-2"
         sys.exit(-1)
 
+    (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub)
     
-    #====================
-    # read password file
-    #====================
-    try:
-        f=file(apihub)
-        (account,passwd)=f.readline().split(' ')
-        if passwd.endswith('\n'):
-            passwd=passwd[:-1]
-        f.close()
-    except :
-        print "error with password file"
-        sys.exit(-2)
-    
-    			
-    
-    #==================================================
-    #      prepare wget command line to search catalog
-    #==================================================
-    if os.path.exists('query_results.xml'):
-        os.remove('query_results.xml')
-    
-    
-    
-    if downloader=="aria2":
-        wg='aria2c --check-certificate=false'
-        auth='--http-user="%s" --http-passwd="%s"'%(account,passwd)
-        search_output=" --continue -o query_results.xml"
-        wg_opt=" -o "
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-            value="\$value"
-        else:
-            value="$value"
-    else :
-        wg="wget --no-check-certificate "
-        auth='--user="%s" --password="%s"'%(account,passwd)
-        search_output="--output-document=query_results.xml"
-        wg_opt=" --continue --output-document="
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-            value="\\$value"
-        else:
-            value="$value"
     producttype=None
     if sentinel=="S2":
         if level=="L1C":
@@ -236,9 +399,8 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
     #=======================
     
     # ggranga edit: if list_only, do not download but save element to download later 
-    if list_only:
-        list_prod = list()
-        list_filename = list()
+    list_prod = list()
+    list_filename = list()
 
     for i in range(len(request_list)):
         os.system(request_list[i])
@@ -291,164 +453,15 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                 print "===============================================\n"
 
                 # ggranga edit: if lis_only, do not download but save element as to download later 
-                if list_only:
-                    list_prod.append(link)
-                    list_filename.append(filename)
+                list_prod.append(link)
+                list_filename.append(filename)
                 # otherwise, continue with the original code
-                else:
-    
-                    #==================================download  whole product
-                    if( cloud<max_cloud or (sentinel.find("S1")>=0)) and tile==None:
-                        commande_wget='%s %s %s%s/%s "%s"'%(wg,auth,wg_opt,write_dir,filename+".zip",link)
-                        #do not download the product if it was already downloaded and unzipped, or if no_download option was selected.
-                        unzipped_file_exists= os.path.exists(("%s/%s")%(write_dir,filename))
-                        print commande_wget
-                        if unzipped_file_exists==False and no_download==False and (file_list==None or filename in file_list):
-                            os.system(commande_wget)
-                        else :
-                            print unzipped_file_exists, no_download
-        
-                    # download only one tile, file by file.
-                    elif tile!=None:
-                        #do not download the product if the tile is already downloaded.
-                        unzipped_tile_exists = False
-                        if os.path.exists(("%s/%s")%(write_dir,filename)):
-                            if os.path.exists(("%s/%s/%s")%(write_dir,filename,"GRANULE")):
-                                entries = os.listdir(("%s/%s/%s")%(write_dir,filename,"GRANULE"))
-                                for entry in entries:
-                                    entry_split = entry.split("_")
-                                    if len(entry_split) == 11:
-                                        tile_identifier = "T"+tile
-                                        if tile_identifier in entry_split:
-                                            unzipped_tile_exists= True
-        
-                        if unzipped_tile_exists or no_download or (file_list!=None and filename not in file_list):
-                            print unzipped_tile_exists, no_download
-                            print "tile already exists or option -n is set, skipping this download"
-                        else:
-                            #find URL of header file
-                            url_file_dir=link.replace(value,"Nodes('%s')/Nodes"%(filename))
-                            commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'file_dir.xml',url_file_dir)
-                            os.system(commande_wget)
-                            try:
-                                while os.path.getsize('file_dir.xml')==0 : #in case of "bad gateway error"
-                                    os.system(commande_wget)
-                                    time.sleep(10)
-                            except KeyboardInterrupt:
-                                raise
-                            urls,types,names,length=get_elements('file_dir.xml')
-                            #search for the xml file
-                            for i in range(len(urls)):
-                                if names[i].find('SAFL1C')>0 or names[i].find('MSIL1C')>0 or names[i].find('SAFL2A')>0 or names[i].find('MSIL2A.xml')>0:
-                                    xml=names[i]
-                                    url_header=urls[i]
-        
-        
-                            #retrieve list of granules
-                            url_granule_dir=link.replace(value,"Nodes('%s')/Nodes('GRANULE')/Nodes"%(filename))
-                            print url_granule_dir
-                            commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'granule_dir.xml',url_granule_dir)
-                            os.system(commande_wget)
-                            try:
-                                while os.path.getsize('granule_dir.xml')==0 : #in case of "bad gateway error"
-                                    os.system(commande_wget)
-                                    time.sleep(10)
-                            except KeyboardInterrupt:
-                                raise
-                            urls,types,names,length=get_elements('granule_dir.xml')
-                            print(urls)
-                            granule=None
-                            #search for the tile
-                            for i in range(len(urls)):
-                                if names[i].find(tile)>0:
-                                    granule=names[i]
-                            if granule==None:
-                                print "========================================================================"
-                                print "Tile %s is not available within product (check coordinates or tile name)"%tile
-                                print "========================================================================"
-                            else :
-                                #create product directory
-                                product_dir_name=("%s/%s"%(write_dir,filename))
-                                if not(os.path.exists(product_dir_name)) :
-                                    os.mkdir(product_dir_name)
-                                #create tile directory
-                                granule_dir_name=("%s/%s"%(product_dir_name,'GRANULE'))
-                                if not(os.path.exists(granule_dir_name)) :
-                                    os.mkdir(granule_dir_name)
-                                #create tile directory
-        
-                                nom_rep_tuile=("%s/%s"%(granule_dir_name,granule))
-                                if not(os.path.exists(nom_rep_tuile)) :
-                                    os.mkdir(nom_rep_tuile)
-                                # download product header file
-                                print "############################################### header"
-                                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+xml,url_header+"/"+value)
-                                print commande_wget
-                                os.system(commande_wget)
-                                try:
-                                    while os.path.getsize(product_dir_name+'/'+xml)==0 : #in case of "bad gateway error"
-                                        os.system(commande_wget)
-                                        time.sleep(10)
-                                except KeyboardInterrupt:
-                                    raise
-                                #download INSPIRE.xml
-                                url_inspire=link.replace(value,"Nodes('%s')/Nodes('INSPIRE.xml')/"%(filename))
-                                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+"INSPIRE.xml",url_inspire+"/"+value)
-        
-                                print commande_wget
-                                os.system(commande_wget)
-                                try:
-                                    while os.path.getsize(product_dir_name+'/'+"INSPIRE.xml")==0 : #in case of "bad gateway error"
-                                        os.system(commande_wget)
-                                        time.sleep(10)
-                                except KeyboardInterrupt:
-                                    raise
-        
-                                #download manifest.safe
-                                url_manifest=link.replace(value,"Nodes('%s')/Nodes('manifest.safe')/"%(filename))
-                                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+"manifest.safe",url_manifest+"/"+value)
-                                print commande_wget
-                                os.system(commande_wget)
-                                try:
-                                    while os.path.getsize(product_dir_name+'/'+"manifest.safe")==0 : #in case of "bad gateway error"
-                                        os.system(commande_wget)
-                                        time.sleep(10)
-                                except KeyboardInterrupt:
-                                    raise
-        
-                                # rep_info
-                                url_rep_info_dir=link.replace(value,"Nodes('%s')/Nodes('rep_info')/Nodes"%(filename))
-                                get_dir('rep_info',url_rep_info_dir,product_dir_name,wg,auth,wg_opt,value)
-        
-                                # HTML
-                                url_html_dir=link.replace(value,"Nodes('%s')/Nodes('HTML')/Nodes"%(filename))
-                                get_dir('HTML',url_html_dir,product_dir_name,wg,auth,wg_opt,value)
-        
-                                # AUX_DATA
-                                url_auxdata_dir=link.replace(value,"Nodes('%s')/Nodes('AUX_DATA')/Nodes"%(filename))
-                                get_dir('AUX_DATA',url_auxdata_dir,product_dir_name,wg,auth,wg_opt,value)
-        
-                                # DATASTRIP
-                                url_datastrip_dir=link.replace(value,"Nodes('%s')/Nodes('DATASTRIP')/Nodes"%(filename))
-                                get_dir('DATASTRIP',url_datastrip_dir,product_dir_name,wg,auth,wg_opt,value)
-        
-        
-                                # granule files
-                                url_granule="%s('%s')/Nodes"%(url_granule_dir,granule)
-                                commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'granule.xml',url_granule)
-                                print commande_wget
-                                os.system(commande_wget)
-                                try:
-                                    while os.path.getsize("granule.xml")==0 : #in case of "bad gateway error"
-                                        os.system(commande_wget)
-                                        time.sleep(10)
-                                except KeyboardInterrupt:
-                                    raise
-                                download_tree(nom_rep_tuile,"granule.xml",wg,auth,wg_opt,value)
+                if list_only is False:
+                    download_s2product(filename=filename,link=link,downloader=downloader,apihub=apihub,tile=tile,no_download=no_download,write_dir=write_dir,file_list=file_list)
+                    
 
     # ggranga edit: if list_only, return products list
-    if list_only:
-        return list_prod, list_filename
+    return list_prod, list_filename
 
                             
 if __name__ == "__main__":
