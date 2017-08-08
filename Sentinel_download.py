@@ -14,17 +14,18 @@ import optparse
 from xml.dom import minidom
 from datetime import date
 import time
+import zipfile
 
 ###########################################################################
 class OptionParser (optparse.OptionParser):
- 
+
     def check_required (self, opt):
       option = self.get_option(opt)
- 
+
       # Assumes the option's 'default' is set to None!
       if getattr(self.values, option.dest) is None:
           self.error("%s option not supplied" % option)
- 
+
 ###########################################################################
 
 
@@ -48,7 +49,7 @@ def get_elements(xml_file):
 # recursively download file tree of a Granule
 def download_tree(rep,xml_file,wg,auth,wg_opt,value):
     urls,types,names,length=get_elements(xml_file)
-    #print 
+    #print
     #print urls,types,names,length
 
     for i in range(len(urls)):
@@ -104,13 +105,13 @@ def wg_cmd(downloader,apihub):
     except :
         print "error with password file"
         sys.exit(-2)
-    
+
     #==================================================
     #      prepare wget command line to search catalog
     #==================================================
     if os.path.exists('query_results.xml'):
         os.remove('query_results.xml')
-    
+
     if downloader=="aria2":
         wg='aria2c --check-certificate=false'
         auth='--http-user="%s" --http-passwd="%s"'%(account,passwd)
@@ -129,7 +130,7 @@ def wg_cmd(downloader,apihub):
             value="\\$value"
         else:
             value="$value"
-    
+
     return wg,auth,search_output,wg_opt,value
 
 
@@ -138,19 +139,22 @@ def wg_cmd(downloader,apihub):
 # Function to download a product after having it in the file list
 # (this function was splitted from main function on order to allow using it with a file list)
 def download_s2product(filename,link,downloader,apihub,tile=None,no_download=False,write_dir='.',file_list=None):
-    
+
     # Compute wg parameters
     (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub)
-    
+
     #==================================download  whole product
     if tile==None:
         commande_wget='%s %s %s%s/%s "%s"'%(wg,auth,wg_opt,write_dir,filename+".zip",link)
         #do not download the product if it was already downloaded and unzipped, or if no_download option was selected.
-        unzipped_file_exists= os.path.exists(("%s/%s")%(write_dir,filename))
+        unzipped_file_exists= os.path.exists(os.path.join(write_dir,filename))
         print commande_wget
         if unzipped_file_exists==False and no_download==False and (file_list==None or filename in file_list):
             os.system(commande_wget)
-        else :
+            # unzip
+            zipfile.ZipFile(os.path.join(write_dir, filename+'.zip')).extractall(write_dir)
+            os.remove(os.path.join(write_dir, filename+'.zip'))
+        else:
             print unzipped_file_exists, no_download
 
     # download only one tile, file by file.
@@ -290,7 +294,7 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
                 except KeyboardInterrupt:
                     raise
                 download_tree(nom_rep_tuile,"granule.xml",wg,auth,wg_opt,value)
-    
+
 
 
 ##########################################################################
@@ -300,10 +304,10 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                       start_ingest_date=None,end_ingest_date=None,start_date=None,level="L1C",end_date=None,
                       orbit=None,apihub=None,proxy=None,no_download=False,max_cloud=110,write_dir='.',
                       sentinel='S2',tile=None,dhus=False,MaxRecords=100,list_only=False,file_list=None):
-    
-    
+
+
     url_search="https://scihub.copernicus.eu/apihub/search?q="
-    
+
     if lat==None or lon==None:
         if latmin==None or lonmin==None or latmax==None or lonmax==None:
             print "provide at least a point or rectangle"
@@ -321,7 +325,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
         sys.exit(-1)
 
     (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub)
-    
+
     producttype=None
     if sentinel=="S2":
         if level=="L1C":
@@ -333,52 +337,52 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
             query_geom='footprint:\\"Intersects(%f,%f)\\"'%(lat,lon)
         else :
             query_geom='footprint:"Intersects(%f,%f)"'%(lat,lon)
-    	
+
     elif geom=='rectangle':
         if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
             query_geom='footprint:\\"Intersects(POLYGON(({lonmin} {latmin}, {lonmax} {latmin}, {lonmax} {latmax}, {lonmin} {latmax},{lonmin} {latmin})))\\"'.format(latmin=latmin,latmax=latmax,lonmin=lonmin,lonmax=lonmax)
         else :
             query_geom='footprint:"Intersects(POLYGON(({lonmin} {latmin}, {lonmax} {latmin}, {lonmax} {latmax}, {lonmin} {latmax},{lonmin} {latmin})))"'.format(latmin=latmin,latmax=latmax,lonmin=lonmin,lonmax=lonmax)
-        
-    
+
+
     if orbit==None:
         query='%s filename:%s*'%(query_geom,sentinel)
     else :
         query='%s filename:%s*R%03d*'%(query_geom,sentinel,orbit)
-    
-    
+
+
     # ingestion date
-    if start_ingest_date!=None:    
+    if start_ingest_date!=None:
         start_ingest_date=start_ingest_date+"T00:00:00.000Z"
     else :
         start_ingest_date="2015-06-23T00:00:00.000Z"
-    
+
     if end_ingest_date!=None:
         end_ingest_date=end_ingest_date+"T23:59:50.000Z"
     else:
         end_ingest_date="NOW"
-    
+
     if start_ingest_date!=None or end_ingest_date!=None:
         query_date=" ingestiondate:[%s TO %s]"%(start_ingest_date,end_ingest_date)
         query=query+query_date
-    
-    
-    if producttype !=None:    
+
+
+    if producttype !=None:
         query_producttype=" producttype:%s "%producttype
         query=query+query_producttype
-        
-    # acquisition date    
-    
-    if start_date!=None:    
+
+    # acquisition date
+
+    if start_date!=None:
         start_date=start_date
     else :
         start_date="20150613" #Sentinel-2 launch date
-        
+
     if end_date!=None:
         end_date=end_date
     else:
-        end_date=date.today().strftime(format='%Y%m%d') 
-    
+        end_date=date.today().strftime(format='%Y%m%d')
+
     if MaxRecords > 100:
         requests_needed = math.ceil(MaxRecords / 100.0)
         request_list = []
@@ -392,13 +396,13 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
         commande_wget='%s %s %s "%s%s&rows=%d"'%(wg,auth,search_output,url_search,query,MaxRecords)
         print commande_wget
         request_list = [commande_wget]
-    
-    
+
+
     #=======================
     # parse catalog output»
     #=======================
-    
-    # ggranga edit: if list_only, do not download but save element to download later 
+
+    # ggranga edit: if list_only, do not download but save element to download later
     list_prod = list()
     list_filename = list()
 
@@ -411,13 +415,13 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
             link=prod.getElementsByTagName("link")[0].attributes.items()[0][1]
             #to avoid wget to remove $ special character
             link=link.replace('$value',value)
-    
-    
+
+
             for node in prod.getElementsByTagName("str"):
                 (name,field)=node.attributes.items()[0]
                 if field=="filename":
                     filename= str(node.toxml()).split('>')[1].split('<')[0]   #ugly, but minidom is not straightforward
-    
+
             #test if product is within the requested time period
             if sentinel.startswith("S2"):
                 if len(filename.split("_")) == 7:
@@ -429,9 +433,9 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
             else :
                 print "Please choose either S1 or S2"
                 sys.exit(-1)
-    
+
             if date_prod>=start_date and date_prod<=end_date:
-    
+
                 # print what has been found
                 print "\n==============================================="
                 print date_prod,start_date,end_date
@@ -439,8 +443,8 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                 print link
                 if dhus==True:
                     link=link.replace("apihub","dhus")
-    
-                   
+
+
                 if sentinel.find("S2") >=0 :
                     for node in prod.getElementsByTagName("double"):
                         (name,field)=node.attributes.items()[0]
@@ -449,21 +453,21 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                             print "cloud percentage = %5.2f %%"%cloud
                 else:
                     cloud=0
-    
+
                 print "===============================================\n"
 
-                # ggranga edit: if lis_only, do not download but save element as to download later 
+                # ggranga edit: if lis_only, do not download but save element as to download later
                 list_prod.append(link)
                 list_filename.append(filename)
                 # otherwise, continue with the original code
                 if list_only is False:
                     download_s2product(filename=filename,link=link,downloader=downloader,apihub=apihub,tile=tile,no_download=no_download,write_dir=write_dir,file_list=file_list)
-                    
+
 
     # ggranga edit: if list_only, return products list
     return list_prod, list_filename
 
-                            
+
 if __name__ == "__main__":
     #==================
     #parse command line
@@ -496,7 +500,7 @@ if __name__ == "__main__":
         parser.add_option("--id", "--start_ingest_date", dest="start_ingest_date", action="store", type="string", \
                 help="start ingestion date, fmt('2015-12-22')",default=None)
         parser.add_option("--if","--end_ingest_date", dest="end_ingest_date", action="store", type="string", \
-                help="end ingestion date, fmt('2015-12-23')",default=None)     
+                help="end ingestion date, fmt('2015-12-23')",default=None)
         parser.add_option("-d", "--start_date", dest="start_date", action="store", type="string", \
                 help="start date, fmt('20151222')",default=None)
         parser.add_option("-l", "--level", dest="level", action="store", type="string", \
@@ -504,7 +508,7 @@ if __name__ == "__main__":
         parser.add_option("-f","--end_date", dest="end_date", action="store", type="string", \
                 help="end date, fmt('20151223')",default=None)
         parser.add_option("-o","--orbit", dest="orbit", action="store", type="int", \
-                help="Orbit Number", default=None)			
+                help="Orbit Number", default=None)
         parser.add_option("-a","--apihub_passwd", dest="apihub", action="store", type="string", \
                 help="ESA apihub account and password file")
         parser.add_option("-p","--proxy_passwd", dest="proxy", action="store", type="string", \
@@ -525,12 +529,12 @@ if __name__ == "__main__":
                 help="maximum number of records to download (default=100)",default=100)
         parser.add_option("--list_only",dest="list_only",action="store_true",  \
                 help="Only list available products, without downloading",default=False)
-    
-    
+
+
         (options, args) = parser.parse_args()
-            
-        parser.check_required("-a")    
-        
+
+        parser.check_required("-a")
+
     Sentinel_download(options.downloader,options.lat,options.lon,options.latmin,options.latmax,options.lonmin,options.lonmax,
                       options.start_ingest_date,options.end_ingest_date,options.start_date,options.level,options.end_date,
                       options.orbit,options.apihub,options.proxy,options.no_download,options.max_cloud,options.write_dir,
