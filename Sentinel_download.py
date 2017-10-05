@@ -411,7 +411,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
         xml=minidom.parse("query_results.xml")
         products=xml.getElementsByTagName("entry")
         for prod in products:
-            ident=prod.getElementsByTagName("id")[0].firstChild.data
+            #ident=prod.getElementsByTagName("id")[0].firstChild.data # lranghetti hidden manually
             link=prod.getElementsByTagName("link")[0].attributes.items()[0][1]
             #to avoid wget to remove $ special character
             link=link.replace('$value',value)
