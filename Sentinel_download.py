@@ -402,7 +402,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
     # parse catalog output»
     #=======================
 
-    # ggranga edit: if list_only, do not download but save element to download later
+    # ranghetti edit: if list_only, do not download but save element to download later
     list_prod = list()
     list_filename = list()
 
@@ -456,7 +456,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
 
                 print "===============================================\n"
 
-                # ggranga edit: if lis_only, do not download but save element as to download later
+                # ranghetti edit: if lis_only, do not download but save element as to download later
                 list_prod.append(link)
                 list_filename.append(filename)
                 # otherwise, continue with the original code
@@ -464,7 +464,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                     download_s2product(filename=filename,link=link,downloader=downloader,apihub=apihub,tile=tile,no_download=no_download,write_dir=write_dir,file_list=file_list)
 
 
-    # ggranga edit: if list_only, return products list
+    # ranghetti edit: if list_only, return products list
     return list_prod, list_filename
 
 
