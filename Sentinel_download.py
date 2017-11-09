@@ -15,6 +15,7 @@ from xml.dom import minidom
 from datetime import date
 import time
 import zipfile
+import subprocess
 
 ###########################################################################
 class OptionParser (optparse.OptionParser):
@@ -59,31 +60,36 @@ def download_tree(rep,xml_file,wg,auth,wg_opt,value):
             if not(os.path.exists(nom_rep)):
                 os.mkdir(nom_rep)
             commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'files.xml',urls[i]+"/Nodes")
-            print commande_wget
-            os.system(commande_wget)
+            # print commande_wget
+            FNULL = open(os.devnull, 'w')
+            subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
             try:
                 while os.path.getsize("files.xml")==0 : #in case of "bad gateway error"
-                    os.system(commande_wget)
+                    FNULL = open(os.devnull, 'w')
+                    subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                     time.sleep(10)
             except KeyboardInterrupt:
                 raise
             download_tree(nom_rep,'files.xml',wg,auth,wg_opt,value)
         else: # a file
             commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,rep+'/'+names[i],urls[i]+'/'+value)
-            os.system(commande_wget)
+            FNULL = open(os.devnull, 'w')
+            subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
             #while os.path.getsize(rep+'/'+names[i])==0 : #retry download in case of a Bad Gateway error"
-            #    os.system(commande_wget)
+            #    subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT)
 
 def get_dir(dir_name,dir_url,product_dir_name,wg,auth,wg_opt,value):
     dir=("%s/%s"%(product_dir_name,dir_name))
     if not(os.path.exists(dir)) :
         os.mkdir(dir)
     commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'temp.xml',dir_url)
-    print commande_wget
-    os.system(commande_wget)
+    # print commande_wget
+    FNULL = open(os.devnull, 'w')
+    subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
     try:
         while os.path.getsize("temp.xml")==0 : #in case of "bad gateway error"
-            os.system(commande_wget)
+            FNULL = open(os.devnull, 'w')
+            subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
             time.sleep(10)
     except KeyboardInterrupt:
         raise
@@ -122,7 +128,7 @@ def wg_cmd(downloader,apihub):
         else:
             value="$value"
     else :
-        wg="wget --no-check-certificate "
+        wg="wget --no-check-certificate -q " # TODO added -q not to mess in R: create argument for it
         auth='--user="%s" --password="%s"'%(account,passwd)
         search_output="--output-document=query_results.xml"
         wg_opt=" --continue --output-document="
@@ -148,9 +154,10 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
         commande_wget='%s %s %s%s/%s "%s"'%(wg,auth,wg_opt,write_dir,filename+".zip",link)
         #do not download the product if it was already downloaded and unzipped, or if no_download option was selected.
         unzipped_file_exists= os.path.exists(os.path.join(write_dir,filename))
-        print commande_wget
+        # print commande_wget
         if unzipped_file_exists==False and no_download==False and (file_list==None or filename in file_list):
-            os.system(commande_wget)
+            FNULL = open(os.devnull, 'w')
+            subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
             # unzip
             zipfile.ZipFile(os.path.join(write_dir, filename+'.zip')).extractall(write_dir)
             os.remove(os.path.join(write_dir, filename+'.zip'))
@@ -178,10 +185,12 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
             #find URL of header file
             url_file_dir=link.replace(value,"Nodes('%s')/Nodes"%(filename))
             commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'file_dir.xml',url_file_dir)
-            os.system(commande_wget)
+            FNULL = open(os.devnull, 'w')
+            subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
             try:
                 while os.path.getsize('file_dir.xml')==0 : #in case of "bad gateway error"
-                    os.system(commande_wget)
+                    FNULL = open(os.devnull, 'w')
+                    subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                     time.sleep(10)
             except KeyboardInterrupt:
                 raise
@@ -197,10 +206,12 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
             url_granule_dir=link.replace(value,"Nodes('%s')/Nodes('GRANULE')/Nodes"%(filename))
             print url_granule_dir
             commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'granule_dir.xml',url_granule_dir)
-            os.system(commande_wget)
+            FNULL = open(os.devnull, 'w')
+            subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
             try:
                 while os.path.getsize('granule_dir.xml')==0 : #in case of "bad gateway error"
-                    os.system(commande_wget)
+                    FNULL = open(os.devnull, 'w')
+                    subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                     time.sleep(10)
             except KeyboardInterrupt:
                 raise
@@ -232,11 +243,13 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
                 # download product header file
                 print "############################################### header"
                 commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+xml,url_header+"/"+value)
-                print commande_wget
-                os.system(commande_wget)
+                # print commande_wget
+                FNULL = open(os.devnull, 'w')
+                subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                 try:
                     while os.path.getsize(product_dir_name+'/'+xml)==0 : #in case of "bad gateway error"
-                        os.system(commande_wget)
+                        FNULL = open(os.devnull, 'w')
+                        subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                         time.sleep(10)
                 except KeyboardInterrupt:
                     raise
@@ -244,11 +257,13 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
                 url_inspire=link.replace(value,"Nodes('%s')/Nodes('INSPIRE.xml')/"%(filename))
                 commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+"INSPIRE.xml",url_inspire+"/"+value)
 
-                print commande_wget
-                os.system(commande_wget)
+                # print commande_wget
+                FNULL = open(os.devnull, 'w')
+                subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                 try:
                     while os.path.getsize(product_dir_name+'/'+"INSPIRE.xml")==0 : #in case of "bad gateway error"
-                        os.system(commande_wget)
+                        FNULL = open(os.devnull, 'w')
+                        subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                         time.sleep(10)
                 except KeyboardInterrupt:
                     raise
@@ -256,11 +271,13 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
                 #download manifest.safe
                 url_manifest=link.replace(value,"Nodes('%s')/Nodes('manifest.safe')/"%(filename))
                 commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,product_dir_name+'/'+"manifest.safe",url_manifest+"/"+value)
-                print commande_wget
-                os.system(commande_wget)
+                # print commande_wget
+                FNULL = open(os.devnull, 'w')
+                subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                 try:
                     while os.path.getsize(product_dir_name+'/'+"manifest.safe")==0 : #in case of "bad gateway error"
-                        os.system(commande_wget)
+                        FNULL = open(os.devnull, 'w')
+                        subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                         time.sleep(10)
                 except KeyboardInterrupt:
                     raise
@@ -285,11 +302,13 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
                 # granule files
                 url_granule="%s('%s')/Nodes"%(url_granule_dir,granule)
                 commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'granule.xml',url_granule)
-                print commande_wget
-                os.system(commande_wget)
+                # print commande_wget
+                FNULL = open(os.devnull, 'w')
+                subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                 try:
                     while os.path.getsize("granule.xml")==0 : #in case of "bad gateway error"
-                        os.system(commande_wget)
+                        FNULL = open(os.devnull, 'w')
+                        subprocess.call(commande_wget, stdout=FNULL, stderr=subprocess.STDOUT, close_fds=True)
                         time.sleep(10)
                 except KeyboardInterrupt:
                     raise
@@ -394,7 +413,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                 request_list.append('%s %s %s "%s%s&rows=%d&start=%d"'%(wg,auth,search_output,url_search,query,100,i*100))
     else:
         commande_wget='%s %s %s "%s%s&rows=%d"'%(wg,auth,search_output,url_search,query,MaxRecords)
-        print commande_wget
+        # print commande_wget
         request_list = [commande_wget]
 
 
