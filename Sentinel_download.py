@@ -383,13 +383,17 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
     else:
         end_date=date.today().strftime(format='%Y%m%d')
 
-    if MaxRecords > 100:
-        requests_needed = math.ceil(MaxRecords / 100.0)
+    if MaxRecords > 100 or MaxRecords == 0:
+        if MaxRecords == 0: # ranghetti edit
+            max_records = 1E6 # generate a unusefully huge number of possible requests
+        else:
+            max_records = MaxRecords
+        requests_needed = math.ceil(max_records / 100.0)
         request_list = []
         current_records = 0
         for i in range(int(requests_needed)):
-            if (i+1)*100 > MaxRecords:
-                request_list.append('%s %s %s "%s%s&rows=%d&start=%d"' % (wg, auth, search_output, url_search, query, MaxRecords % 100, i * 100))
+            if (i+1)*100 > max_records:
+                request_list.append('%s %s %s "%s%s&rows=%d&start=%d"' % (wg, auth, search_output, url_search, query, max_records % 100, i * 100))
             else:
                 request_list.append('%s %s %s "%s%s&rows=%d&start=%d"'%(wg,auth,search_output,url_search,query,100,i*100))
     else:
@@ -410,6 +414,11 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
         os.system(request_list[i])
         xml=minidom.parse("query_results.xml")
         products=xml.getElementsByTagName("entry")
+        if (len(products)==0 and MaxRecords==0): # length of the  query: with MaxRecords==0, stop cycle after a query of length 0
+            break # ranghetti edit
+        if len(request_list) > 1:
+            print "Querying products " + str(100*i+1) + " to " + str(100*i+len(products)) + "..."
+
         for prod in products:
             #ident=prod.getElementsByTagName("id")[0].firstChild.data # lranghetti hidden manually
             link=prod.getElementsByTagName("link")[0].attributes.items()[0][1]
