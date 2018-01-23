@@ -412,7 +412,11 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
 
     for i in range(len(request_list)):
         os.system(request_list[i])
-        xml=minidom.parse("query_results.xml")
+        try:
+            print("The Copernicus Open Access Hub is temporarily unavailable.")
+            xml=minidom.parse("query_results.xml")
+        except:
+            break
         products=xml.getElementsByTagName("entry")
         if (len(products)==0 and MaxRecords==0): # length of the  query: with MaxRecords==0, stop cycle after a query of length 0
             break # ranghetti edit
