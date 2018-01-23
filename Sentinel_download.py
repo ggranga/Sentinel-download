@@ -172,7 +172,6 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
                             unzipped_tile_exists= True
 
         if unzipped_tile_exists or no_download or (file_list!=None and filename not in file_list):
-            print unzipped_tile_exists, no_download
             print "tile already exists or option -n is set, skipping this download"
         else:
             #find URL of header file
