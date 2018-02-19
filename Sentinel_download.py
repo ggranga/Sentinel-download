@@ -92,7 +92,7 @@ def get_dir(dir_name,dir_url,product_dir_name,wg,auth,wg_opt,value):
 # ------------------------
 # Function to preprare wget command
 # (splitted from main function in order to be used both in main than in download_s2product)
-def wg_cmd(downloader,apihub):
+def wg_cmd(downloader,apihub,wget_path=''):
     #====================
     # read password file
     #====================
@@ -122,7 +122,11 @@ def wg_cmd(downloader,apihub):
         else:
             value="$value"
     else :
-        wg="wget --no-check-certificate -q " # TODO added -q not to mess in R: create argument for it
+        if sys.platform.startswith('win'):
+            wg_bin=os.path.join(wget_path,"wget.exe")
+        else:
+            wg_bin=os.path.join(wget_path,"wget")
+        wg=wg_bin+" --no-check-certificate -q " # TODO added -q not to mess in R: create argument for it
         auth='--user="%s" --password="%s"'%(account,passwd)
         search_output="--output-document=query_results.xml"
         wg_opt=" --continue --output-document="
@@ -141,7 +145,7 @@ def wg_cmd(downloader,apihub):
 def download_s2product(filename,link,downloader,apihub,tile=None,no_download=False,write_dir='.',file_list=None):
 
     # Compute wg parameters
-    (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub)
+    (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub,wget_path=wget_path)
 
     #==================================download  whole product
     if tile==None:
@@ -302,8 +306,7 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
 def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,lonmin=None,lonmax=None,
                       start_ingest_date=None,end_ingest_date=None,start_date=None,level="L1C",end_date=None,
                       orbit=None,apihub=None,proxy=None,no_download=False,max_cloud=110,write_dir='.',
-                      sentinel='S2',tile=None,dhus=False,MaxRecords=100,list_only=False,file_list=None):
-
+                      sentinel='S2',tile=None,dhus=False,MaxRecords=100,list_only=False,file_list=None,wget_path=''):
 
     url_search="https://scihub.copernicus.eu/apihub/search?q="
 
@@ -323,7 +326,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
         print "The tile option (-t) can only be used for Sentinel-2"
         sys.exit(-1)
 
-    (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub)
+    (wg,auth,search_output,wg_opt,value) = wg_cmd(downloader,apihub,wget_path=wget_path)
 
     producttype=None
     if sentinel=="S2":
@@ -332,16 +335,10 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
         elif  level=="L2A":
             producttype="S2MSI2Ap"
     if geom=='point':
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-            query_geom='footprint:\\"Intersects(%f,%f)\\"'%(lat,lon)
-        else :
-            query_geom='footprint:"Intersects(%f,%f)"'%(lat,lon)
+        query_geom='footprint:\\"Intersects(%f,%f)\\"'%(lat,lon)
 
     elif geom=='rectangle':
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-            query_geom='footprint:\\"Intersects(POLYGON(({lonmin} {latmin}, {lonmax} {latmin}, {lonmax} {latmax}, {lonmin} {latmax},{lonmin} {latmin})))\\"'.format(latmin=latmin,latmax=latmax,lonmin=lonmin,lonmax=lonmax)
-        else :
-            query_geom='footprint:"Intersects(POLYGON(({lonmin} {latmin}, {lonmax} {latmin}, {lonmax} {latmax}, {lonmin} {latmax},{lonmin} {latmin})))"'.format(latmin=latmin,latmax=latmax,lonmin=lonmin,lonmax=lonmax)
+        query_geom='footprint:\\"Intersects(POLYGON(({lonmin} {latmin}, {lonmax} {latmin}, {lonmax} {latmax}, {lonmin} {latmax},{lonmin} {latmin})))\\"'.format(latmin=latmin,latmax=latmax,lonmin=lonmin,lonmax=lonmax)
 
 
     if orbit==None:
@@ -412,7 +409,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
     for i in range(len(request_list)):
         os.system(request_list[i])
         try:
-            print("The Copernicus Open Access Hub is temporarily unavailable.")
+            # print("The Copernicus Open Access Hub is temporarily unavailable.")
             xml=minidom.parse("query_results.xml")
         except:
             break
@@ -541,6 +538,8 @@ if __name__ == "__main__":
                 help="maximum number of records to download (default=100)",default=100)
         parser.add_option("--list_only",dest="list_only",action="store_true",  \
                 help="Only list available products, without downloading",default=False)
+        parser.add_option("--wget_path", dest="wget_path", action="store",type="string",  \
+                help="Path in which the wget executable binary is (empty if this path is part of PATH environmental variable)",default='')
 
 
         (options, args) = parser.parse_args()
@@ -550,4 +549,4 @@ if __name__ == "__main__":
     Sentinel_download(options.downloader,options.lat,options.lon,options.latmin,options.latmax,options.lonmin,options.lonmax,
                       options.start_ingest_date,options.end_ingest_date,options.start_date,options.level,options.end_date,
                       options.orbit,options.apihub,options.proxy,options.no_download,options.max_cloud,options.write_dir,
-                      options.sentinel,options.tile,options.dhus,options.MaxRecords,options.list_only)
+                      options.sentinel,options.tile,options.dhus,options.MaxRecords,options.list_only,options.wget_path)
