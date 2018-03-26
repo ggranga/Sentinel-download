@@ -199,7 +199,7 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
 
             #retrieve list of granules
             url_granule_dir=link.replace(value,"Nodes('%s')/Nodes('GRANULE')/Nodes"%(filename))
-            print url_granule_dir
+            # print url_granule_dir
             commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'granule_dir.xml',url_granule_dir)
             os.system(commande_wget)
             try:
@@ -209,7 +209,7 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
             except KeyboardInterrupt:
                 raise
             urls,types,names,length=get_elements('granule_dir.xml')
-            print(urls)
+            # print(urls)
             granule=None
             #search for the tile
             for i in range(len(urls)):
