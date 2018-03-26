@@ -159,8 +159,8 @@ def download_s2product(filename,link,downloader,apihub,tile=None,no_download=Fal
             # unzip
             zipfile.ZipFile(os.path.join(write_dir, filename+'.zip')).extractall(write_dir)
             os.remove(os.path.join(write_dir, filename+'.zip'))
-        else:
-            print unzipped_file_exists, no_download
+        # else:
+        #     print unzipped_file_exists, no_download
 
     # download only one tile, file by file.
     elif tile!=None:
