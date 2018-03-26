@@ -55,7 +55,7 @@ def download_tree(rep,xml_file,wg,auth,wg_opt,value):
     for i in range(len(urls)):
         if length[i]==0: # then it is a directory
             nom_rep="%s/%s"%(rep,names[i])
-            print nom_rep
+            #print nom_rep
             if not(os.path.exists(nom_rep)):
                 os.mkdir(nom_rep)
             commande_wget='%s %s %s%s "%s"'%(wg,auth,wg_opt,'files.xml',urls[i]+"/Nodes")
@@ -126,7 +126,7 @@ def wg_cmd(downloader,apihub,wget_path=''):
             wg_bin=os.path.join(wget_path,"wget.exe")
         else:
             wg_bin=os.path.join(wget_path,"wget")
-        print "wg_bin: "+wget_path # FIXME remove
+        #print "wg_bin: "+wget_path # FIXME remove
         wg=wg_bin+" --no-check-certificate -q " # TODO added -q not to mess in R: create argument for it
         auth='--user="%s" --password="%s"'%(account,passwd)
         search_output="--output-document=query_results.xml"
@@ -309,7 +309,7 @@ def Sentinel_download(downloader=None,lat=None,lon=None,latmin=None,latmax=None,
                       orbit=None,apihub=None,proxy=None,no_download=False,max_cloud=110,write_dir='.',
                       sentinel='S2',tile=None,dhus=False,MaxRecords=100,list_only=False,wgetPath='',file_list=None):
                         
-    print "Wget_path Sentinel_download: "+wgetPath # FIXME remove
+    #print "Wget_path Sentinel_download: "+wgetPath # FIXME remove
 
     url_search="https://scihub.copernicus.eu/apihub/search?q="
 
